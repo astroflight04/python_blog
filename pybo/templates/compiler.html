@@ -1,0 +1,143 @@
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Python, C, Java Online Compiler</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='codemirror/lib/codemirror.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='codemirror/theme/material.css') }}">
+
+</head>
+<body>
+    <h1>Online Compiler</h1>
+
+    <label for="language">Select Language:</label>
+    <select id="language">
+        <option value="python">Python</option>
+        <option value="c">C</option>
+        <option value="java">Java</option>
+    </select>
+
+    <h3>Execution STDIN:</h3> <!--20240914-->
+    <textarea id="stdin" name="stdin"></textarea> <!--20240914-->
+    <h3>Your Codes:</h3> <!--20240914-->
+    <textarea id="code" name="code"></textarea>
+    <button onclick="runCode()">Run Code</button>
+    <button onclick="saveCode()">Save Code</button> <!--20240907-->
+    <button onclick="loadCode()">Load Code</button> <!--20240907-->
+    <button onclick="shareCode()">Share This Code</button>
+    <button onclick="goBack()">Back to the Board</button>
+
+    <h3>Saved Codes:</h3> <!--20240907-->
+    <select id="saved_codes">
+        {% for codefile in codefiles %}
+            <option value="{{ codefile.filename }}">{{ codefile.filename[-6:] }}</option>
+        {% endfor %}
+    </select>
+
+    <h3>Output:</h3>
+    <pre id="output"></pre>
+
+    <script src="{{ url_for('static', filename='codemirror/lib/codemirror.js') }}"></script>
+    <script src="{{ url_for('static', filename='codemirror/mode/python/python.js') }}"></script>
+    <script src="{{ url_for('static', filename='codemirror/mode/clike/clike.js') }}"></script>
+    <script src="{{ url_for('static', filename='codemirror/mode/java/java.js') }}"></script>
+    <script>
+        var editor = CodeMirror.fromTextArea(document.getElementById("code"), {
+            lineNumbers: true,
+            mode: "python",  // 기본 모드는 Python
+            theme: "material"
+        });
+
+        document.getElementById("language").addEventListener("change", function() {
+            var mode = this.value === "python" ? "python" : "text/x-csrc";
+            if (this.value === "java") {
+                mode = "text/x-java";
+            }
+            editor.setOption("mode", mode);
+        });
+
+        function runCode() {
+            var language = document.getElementById("language").value;
+            var stdin = document.getElementById("stdin").value;
+            fetch("{{ url_for('compiler.run_code') }}", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    code: editor.getValue(),
+                    language: language,
+                    stdin: stdin  // stdin 값 추가
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('output').textContent = data.output;
+            });
+        }
+
+        function saveCode() {
+            var fileid = document.getElementById("saved_codes").value;
+            fetch("{{ url_for('compiler.save_code') }}", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    code: editor.getValue(),
+                    filename: fileid  // 선택된 파일 ID 사용
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert("Code saved successfully.");
+                } else {
+                    alert("Failed to save code: " + data.message);
+                }
+            });
+        }
+
+        function loadCode() {
+            var fileid = document.getElementById("saved_codes").value;
+            fetch("{{ url_for('compiler.load_code') }}?fileid=" + fileid)  // 선택된 파일 ID 사용
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    editor.setValue(data.code);
+                } else {
+                    alert("Failed to load code: " + data.message);
+                    editor.setValue('');
+                }
+            });
+        }
+
+        document.getElementById("saved_codes").addEventListener("change", function() {
+            loadCode(); // 파일 선택이 변경될 때마다 코드 로드
+        });
+
+        function shareCode() {
+            var code = encodeURIComponent(editor.getValue());
+            var language = encodeURIComponent(document.getElementById("language").value);
+
+            // URL을 생성하기 전에 Flask에서 제공하는 절대 URL을 사용
+            var baseUrl = "{{ url_for('question.create') }}";
+            var url = new URL(baseUrl, window.location.origin);
+            url.searchParams.append("code", code);
+            url.searchParams.append("language", language);
+
+            window.location.href = url;
+        }
+
+        // 페이지 로드 후, 기본값으로 선택된 파일의 코드를 로드
+        document.addEventListener("DOMContentLoaded", function() {
+            loadCode();
+        });
+
+        function goBack() {
+            window.location.href = "{{ url_for('main.index') }}";
+        }
+
+    </script>
+</body>
+</html>
+

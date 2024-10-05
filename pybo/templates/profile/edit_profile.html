@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit Profile</title>
+    <style>
+        .edit-container {
+            text-align: center;
+            margin: 50px;
+        }
+        .form-field {
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="edit-container">
+        <h2>Edit Profile</h2>
+            <div class="form-field">
+                <label for="name">Name:</label>
+                <input type="text" id="name" name="name" value="{{ profile.username }}" required readonly>
+            </div>
+        <form action="{{ url_for('profile.edit_profile') }}" method="POST" enctype="multipart/form-data">
+
+            <div class="form-field">
+                <label for="bio">Bio (400 characters max):</label>
+                <textarea id="bio" name="bio" maxlength="400">{{ profile.bio }}</textarea>
+            </div>
+            <div class="form-field">
+                <label for="profile_picture">Profile Picture:</label>
+                <input type="file" id="profile_picture" name="profile_picture">
+            </div>
+            <div class="form-field">
+                <button type="submit">Save Changes</button>
+            </div>
+        </form>
+    </div>
+</body>
+</html>

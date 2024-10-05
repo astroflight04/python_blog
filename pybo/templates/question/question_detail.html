@@ -1,0 +1,142 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div class="container my-3">
+    <!-- flash 오류 -->
+    {% for message in get_flashed_messages() %}
+    <div class="alert alert-danger" role="alert">
+        {{ message }}
+    </div>
+    {% endfor %}
+    <!-- 질문 -->
+    <h2 class="border-bottom py-2">{{ question.subject }}</h2>
+    <div class="card my-3">
+        <div class="card-body">
+            <div class="card-text">{{ question.content|markdown }}</div>
+            <div class="d-flex justify-content-end">
+                <div class="badge bg-light text-dark p-2">
+                    {{ question.create_date }}
+                </div>
+            </div>
+            <div class="my-3">      <!--20230722 -->
+                {% if g.user == question.user %}
+                <a href="{{ url_for('question.modify', question_id=question.id) }}"
+                class="btn btn-sm btn-outline-secondary">수정</a>
+                <a href="javascript:void(0)" class="delete btn btn-sm btn-outline-secondary"
+               data-uri="{{ url_for('question.delete', question_id=question.id) }}">삭제</a>
+                {% endif %}
+            </div>      <!--20230722 -->
+        </div>
+    </div>
+    <!-- 답변 목록 -->
+    <h5 class="border-bottom my-3 py-2">{{ question.answer_set|length }}개의 답변이 있습니다.</h5>
+    {% for answer in question.answer_set %}
+    <div class="card my-3">
+        <div class="card-body">
+            <div class="card-text">{{ answer.content|markdown }}</div>
+            <div class="d-flex justify-content-end">
+                <div class="badge bg-light text-dark p-2">
+                    {{ answer.create_date }}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+    <!-- 답변 등록 -->
+    <form action="{{ url_for('answer.create', question_id=question.id) }}" method="post" class="my-3">
+        {{ form.csrf_token }}
+        <!-- 오류표시 Start -->
+        {% if form.errors %}
+        <div class="alert alert-danger" role="alert">
+            {% for field, errors in form.errors.items() %}
+            <strong>{{ form[field].label }}</strong>
+            <ul>
+                {% for error in errors %}
+                <li>{{ error }}</li>
+                {% endfor %}
+            </ul>
+            {% endfor %}
+        </div>
+        {% endif %}
+        <!-- 오류표시 End -->
+
+        <div class="mb-3 position-relative">
+            <textarea {% if not g.user %}disabled{% endif %} name="content" id="content" class="form-control" rows="10"></textarea>
+            <!-- 멘션 자동 완성 리스트 -->
+            <div id="mention-container" class="mention-container position-absolute" style="display: none;">
+                <div class="mention-header">User-list</div>
+                <div id="mention-list" class="mention-list"></div>
+            </div>
+        </div>
+        <div class="mb-3">
+            <img src="{{ '../../' + question.uploaded_img_file }}" alt="Uploaded Image" width="300" height="200">
+        </div>
+        <input type="submit" value="답변등록" class="btn btn-primary">
+    </form>
+</div>
+
+{% endblock %}
+{% block script %}
+<script type='text/javascript'>
+const delete_elements = document.getElementsByClassName("delete");
+Array.from(delete_elements).forEach(function(element) {
+    element.addEventListener('click', function() {
+        if(confirm("정말로 삭제하시겠습니까?")) {
+            location.href = this.dataset.uri;
+        };
+    });
+});
+
+// 멘션 자동 완성 기능
+const textarea = document.getElementById("content");
+const mentionContainer = document.getElementById("mention-container");
+const mentionList = document.getElementById("mention-list");
+
+// ID 생성 규칙: 알파벳, 숫자, 밑줄(_)만 허용하는 정규식
+const idRegex = /^[A-Za-z0-9_]+$/;
+
+let mentionCompleted = false; // 멘션이 완료되었는지 여부
+
+textarea.addEventListener("input", function(event) {
+    if (mentionCompleted) return; // 멘션이 완료되면 더 이상 쿼리하지 않음
+
+    const text = textarea.value;
+    const mentionIndex = text.lastIndexOf('@');
+
+    if (mentionIndex !== -1) {
+        const mentionQuery = text.substring(mentionIndex + 1).trim().split(' ')[0]; // 스페이스바로 구분
+        if (mentionQuery.length >= 3 && idRegex.test(mentionQuery)) {  // 5글자 이상 + ID 규칙 준수 여부 확인
+            fetch(`/user/search?query=${mentionQuery}`)
+                .then(response => response.json())
+                .then(users => {
+                    mentionList.innerHTML = ''; // 기존 목록 지우기
+                    if (users.length > 0) {
+                        mentionContainer.style.display = 'block'; // 멘션 목록 및 라벨 표시
+                        users.forEach(user => {
+                            const listItem = document.createElement('div');
+                            listItem.textContent = user.username;
+                            listItem.classList.add('mention-item');
+                            listItem.addEventListener('click', function() {
+                                const mentionText = `[${user.username}](/profile/${user.username}) `;
+                                textarea.value = text.substring(0, mentionIndex) + mentionText; // 멘션 추가
+                                mentionList.innerHTML = ''; // 목록 지우기
+                                mentionContainer.style.display = 'none'; // 멘션 목록 숨기기
+                                mentionCompleted = true; // 멘션 완료 상태로 변경
+                                textarea.focus(); // 텍스트 영역 포커스
+                            });
+                            mentionList.appendChild(listItem);
+                        });
+                    } else {
+                        mentionContainer.style.display = 'none'; // 사용자 없을 시 목록 숨기기
+                    }
+                });
+        } else {
+            mentionContainer.style.display = 'none'; // 입력 조건 불충족 시 목록 숨기기
+        }
+    } else {
+        mentionContainer.style.display = 'none'; // '@'가 없으면 목록 숨기기
+    }
+});
+
+</script>
+{% endblock %}

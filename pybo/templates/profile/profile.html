@@ -1,0 +1,178 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Profile</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        .profile-container {
+            text-align: center;
+            margin: 50px;
+        }
+
+        .profile-initial {
+            width: 300px;
+            height: 300px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 150px;
+            font-weight: bold;
+            color: white;
+            margin: 0 auto;
+            background-color: var(--profile-color, #4CAF50); /* 기본 색상 */
+        }
+
+        .profile-details {
+            margin-top: 20px;
+        }
+
+        .vote-buttons {
+            margin-top: 20px;
+        }
+
+        .votes {
+            font-size: 24px;
+            margin-top: 10px;
+        }
+
+        .vote-icon {
+            font-size: 40px;
+            cursor: pointer;
+            margin: 0 10px;
+        }
+
+        .vote-icon.disabled {
+            color: #ccc;
+            cursor: not-allowed;
+        }
+
+        .vote-icon.active {
+            color: #4CAF50;
+        }
+
+        .vote-icon.downvote.active {
+            color: #F44336;
+        }
+    </style>
+</head>
+<body>
+    <div class="profile-container">
+        <!-- 프로필 사진 또는 이름 첫 글자 표시 -->
+        <div class="profile-initial">
+            {% if profile.photo %}
+                <img src="{{ '../../static/upload/profile/' + profile.photo }}" alt="Profile Picture" class="profile-image">
+            {% else %}
+                {{ profile.username[0] }}
+            {% endif %}
+        </div>
+        <div class="profile-details">
+            <h2>{{ profile.username }}</h2>
+            <p>{{ profile.email }}</p>
+            <p>상태: {{ profile.code }}</p>
+            <div class="votes"><span id="vote-count">Upvotes: {{ upvotes }}, Downvotes:{{ downvotes }}
+            </span></div>
+
+        </div>
+
+        <!-- Upvote / Downvote 버튼 -->
+        <div class="vote-buttons">
+            <i class="fas fa-thumbs-up vote-icon upvote" id="upvote-btn"></i>
+            <i class="fas fa-thumbs-down vote-icon downvote" id="downvote-btn"></i>
+        </div>
+
+            <!-- Edit 버튼, 현재 사용자일 때만 표시 -->
+    {% if g.user and g.user.username == profile['username'] %}
+        <div class="edit-button">
+            <a href="{{ url_for('profile.edit_profile') }}" class="btn btn-primary">Edit Profile</a>
+        </div>
+    {% endif %}
+
+    </div>
+
+    <style>
+        .profile-initial {
+            width: 300px;
+            height: 300px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: var(--profile-color, #4CAF50); /* 기본 색상 */
+            overflow: hidden;
+        }
+
+        .profile-image {
+            width: 100%;
+            height: 100%;
+            object-fit: cover; /* 이미지 비율을 유지하면서 공간을 채웁니다 */
+        }
+    </style>
+
+    <script>
+        const targetUserId = {{ profile.id }};  // 현재 프로필 사용자의 ID
+
+        // 페이지 로드 시 로그인한 사용자의 투표 이력 확인
+        fetch(`check_vote/${targetUserId}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    // 업보트 또는 다운보트 여부에 따라 버튼 상태 설정
+                    if (data.vote_type === 'upvote') {
+                        document.getElementById('upvote-btn').classList.add('active', 'disabled');
+                        document.getElementById('downvote-btn').classList.remove('disabled');
+                    } else if (data.vote_type === 'downvote') {
+                        document.getElementById('downvote-btn').classList.add('active', 'disabled');
+                        document.getElementById('upvote-btn').classList.remove('disabled');
+                    }
+                }
+            });
+
+        // 업보트 버튼 클릭
+        document.getElementById('upvote-btn').addEventListener('click', function() {
+            fetch('{{ url_for('profile.upvote') }}', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ target_user_id: targetUserId })  // target_user_id는 현재 보고 있는 프로필의 사용자
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === "success") {
+                    // 투표 수 갱신
+                    document.getElementById('vote-count').textContent = `Upvotes: ${data.upvotes}, Downvotes: ${data.downvotes}`;
+                    // 업보트 상태 갱신 (활성화)
+                    document.getElementById('upvote-btn').classList.add('active', 'disabled');
+                    document.getElementById('downvote-btn').classList.remove('active');
+                    document.getElementById('downvote-btn').classList.remove('disabled');
+                }
+            });
+        });
+
+        // 다운보트 버튼 클릭
+        document.getElementById('downvote-btn').addEventListener('click', function() {
+            fetch('{{ url_for('profile.downvote') }}', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ target_user_id: targetUserId })  // target_user_id는 현재 보고 있는 프로필의 사용자
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === "success") {
+                    // 투표 수 갱신
+                    document.getElementById('vote-count').textContent = `Upvotes: ${data.upvotes}, Downvotes: ${data.downvotes}`;
+                    // 다운보트 상태 갱신 (활성화)
+                    document.getElementById('downvote-btn').classList.add('active', 'disabled');
+                    document.getElementById('upvote-btn').classList.remove('active');
+                    document.getElementById('upvote-btn').classList.remove('disabled');
+                }
+            });
+        });
+    </script>
+</body>
+</html>
+
+{% endblock %}
